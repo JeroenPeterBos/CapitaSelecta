@@ -1,6 +1,7 @@
 import os
 import time
 import math
+import random
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,6 +9,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.data import Dataset
 from tensorflow.data.experimental import AUTOTUNE
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 
 def _benchmark(dataset, num_epochs=1, sleep=0.0):
@@ -23,9 +25,9 @@ def _benchmark(dataset, num_epochs=1, sleep=0.0):
 
 
 class DataContainer:
-    def __init__(self, root, category=None, train=True, augmentation_func=None, multi=False, batch_size=8, output_shape=[128, 128, 3], sample_frac=1.0, dtype=tf.float32):
+    def __init__(self, root, category=None, train=True, augmentation=None, multi=False, batch_size=8, output_shape=[128, 128, 3], sample_frac=1.0, dtype=tf.float32):
         self._root = root
-        self._augmentation_func = augmentation_func
+        self._augmentation = self._aug_params(augmentation)
         self._multi = multi
         self._batch_size = batch_size
         self._output_shape = [None] + output_shape if self._multi else output_shape
@@ -44,11 +46,11 @@ class DataContainer:
 
         # Create the Dataset object
         ds = Dataset \
-            .from_generator(self._generate_filenames(), (tf.string, tf.int16), (tf.TensorShape(self._output_shape[:-3]), tf.TensorShape([]))) \
-            .map(self._decode_multi_sample() if self._multi else self._decode_single_sample(), num_parallel_calls=AUTOTUNE) \
+            .from_generator(self._generate_filenames(), (tf.string, self._dtype), (tf.TensorShape(self._output_shape[:-3]), tf.TensorShape([]))) \
+            .map(self._mapper(self._decode_img()), num_parallel_calls=AUTOTUNE) \
             .cache()
-        
-        if self._augmentation_func is not None:
+
+        if self._augmentation is not None:
             ds = ds.map(self._tf_augmentation_func(), num_parallel_calls=AUTOTUNE)
         
         self._ds = ds
@@ -56,27 +58,49 @@ class DataContainer:
         self.samples = self.df.shape[0]
         self.batches_per_epoch = math.ceil(self.samples / self._batch_size)
     
+    @staticmethod
+    def _aug_params(aug):
+        if aug is not None:
+            def f(flip=None):
+                rot = aug.get('rotation', 0)
+                params = {
+                    'theta': np.random.uniform(-rot, rot),
+                    'flip_horizontal': (random.randint(0, 1) == 0 if flip is None else flip) if aug.get('horizontal_flip', False) else False
+                }
+                return params
+            return f
+        else:
+            return None
+
+    def _mapper(self, func):
+        if self._multi:
+            def f(paths, label):
+                return tf.map_fn(func, paths, fn_output_signature=tf.TensorSpec(self._output_shape[-3:], self._dtype)), label
+                #tf.stack([func(path, label) for path in tf.unstack(paths)]), label
+        else:
+            def f(path, label):
+                return func(path, label), label
+        return f
+
     def _decode_img(self):
-        def f(path):
+        def f(path, label=None):
             img = tf.io.read_file(path)
             img = tf.io.decode_png(img, channels=self._output_shape[-1])
-            img = tf.image.resize_with_crop_or_pad(img, self._output_shape[-3], self._output_shape[-2])
-            img = tf.image.convert_image_dtype(img, dtype=self._dtype)
+            img = tf.image.resize_with_pad(img, self._output_shape[-3], self._output_shape[-2])
+            img = tf.cast(img, self._dtype)
+            img = tf.keras.applications.densenet.preprocess_input(img)
             
             return img
         return f
 
-    def _decode_single_sample(self):
+    def _fill_with_label(self):
         def f(path, label):
-            return self._decode_img()(path), label
+            img = self._decode_img()(path, label)
+            label_tensor = tf.math.scalar_mul(.1, tf.fill(self._output_shape, label))
+            img_tensor = tf.math.scalar_mul(.9, img)
+            return tf.reduce_sum([label_tensor, img_tensor], 0)
         return f
 
-
-    def _decode_multi_sample(self):
-        def f(paths, label):
-            return tf.map_fn(self._decode_img(), paths, fn_output_signature=tf.TensorSpec(self._output_shape[-3:], dtype=self._dtype)), label
-        return f
-    
     def _generate_filenames(self):
         if self._multi:
             def f():
@@ -88,10 +112,26 @@ class DataContainer:
                     yield(row['_img_files'], row['label'])
         return f
     
+    def _py_augmentation_func(self):
+        if self._multi:
+            def f(image):
+                image = image.numpy()
+                flip = random.randint(0, 1) == 0
+                for i in range(image.shape[0]):
+                    image[i] = ImageDataGenerator().apply_transform(x=image[i], transform_parameters=self._augmentation(flip))
+                return image
+        else:
+            def f(image):
+                image = image.numpy()
+                image = ImageDataGenerator().apply_transform(x=image, transform_parameters=self._augmentation())
+                return image
+        return f
+
     def _tf_augmentation_func(self):
+        py_func = self._py_augmentation_func()
         def f(images, label):
             images_shape = images.shape
-            [images, ] = tf.py_function(self._augmentation_func, [images], [self._dtype])
+            [images, ] = tf.py_function(py_func, [images], [self._dtype])
             images.set_shape(images_shape)
             return images, label
         return f
@@ -115,21 +155,31 @@ class DataContainer:
         df['index'] = df.index
         return df
     
-    def show(self, n=4):
+    def show(self, n=4, figsize=None):
         it = iter(self._ds)
 
-        figm, axs = plt.subplots(1, n)
+        figm, axs = plt.subplots(4 if self._multi else 1, n, figsize=figsize)
         for i in range(n):
             imgs, label = next(it)
-            print(imgs, label)
 
             if self._multi:
                 imgs = imgs.numpy().astype(np.float32)
-                axs[i].imshow(imgs[0])
-                axs[i].set_title(label.numpy())
+
+                for j in range(min(4, imgs.shape[0])):
+                    img = imgs[j]
+
+                    img = img - img.min()
+                    img *= 1.0 / img.max()
+
+                    axs[i, j].imshow(img)
+                    axs[i, j].set_title(label.numpy())
             else:
-                imgs = imgs.numpy().astype(np.float32)
-                axs[i].imshow(imgs)
+                img = imgs.numpy().astype(np.float32)
+
+                img = img - img.min()
+                img *= 1.0 / img.max()
+
+                axs[i].imshow(img)
                 axs[i].set_title(label.numpy())
         plt.show()
     
