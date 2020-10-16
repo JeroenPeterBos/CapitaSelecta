@@ -1,9 +1,49 @@
-from tensorflow.keras.layers import AbstractRNNCell, RNN
+from tensorflow.keras.layers import AbstractRNNCell, RNN, Layer
 from tensorflow.python.keras.layers.convolutional_recurrent import ConvRNN2D
 import tensorflow.keras.backend as K
+import tensorflow as tf
+from tensorflow.python.framework import tensor_shape
 
 
-class DynamicMultiViewRNNCell(AbstractRNNCell):
+class Mask(Layer):
+    def __init__(self):
+        super().__init__()
+
+    def build(self, input_shape):
+        self.built = True
+    
+    def compute_output_shape(self, input_shape):
+        return tensor_shape.TensorShape([None, 1])
+    
+    def call(self, x):
+        x = tf.math.count_nonzero(x, axis=[1, 2, 3])
+        x = tf.math.greater(tf.cast(x, dtype=K.floatx()), tf.constant([0], dtype=K.floatx()))
+        x = tf.expand_dims(x, axis=-1)
+        x = tf.cast(x, K.floatx())
+        return x
+
+
+class DynamicMultiViewMeanCell(AbstractRNNCell):
+    def build(self, input_shape):
+        self.units = input_shape[0][-1]
+        self.built = True
+        
+    @property
+    def state_size(self):
+        return (self.units, 1)
+    
+    def call(self, inputs_tuple, states):
+        state, count = states
+        inputs, mask = inputs_tuple
+
+        new_state = tf.math.add(tf.math.multiply(inputs, mask), state)
+        new_count = tf.math.add(count, mask)
+
+        output = tf.math.divide(new_state, new_count)
+        return output, (new_state, new_count)
+
+
+class DynamicMultiViewMaxCell(AbstractRNNCell):
     def build(self, input_shape):
         self.units = input_shape[-1]
         self.built = True
@@ -12,14 +52,19 @@ class DynamicMultiViewRNNCell(AbstractRNNCell):
     def state_size(self):
         return self.units
     
-    def call(self, inputs, states):
+    def call(self, inputs_tuple, states):
+        inputs, mask = inputs_tuple
+
         output = K.maximum(inputs, states[0])
         return output, output
 
 
 class DynamicMultiViewRNN(RNN):
-    def __init__(self, **kwargs):
-        cell = DynamicMultiViewRNNCell(**kwargs)
+    def __init__(self, aggregation_type, **kwargs):
+        if aggregation_type == 'max':
+            cell = DynamicMultiViewMaxCell(**kwargs)
+        elif (aggregation_type == 'mean'):
+            cell = DynamicMultiViewMeanCell(**kwargs)
         super().__init__(cell)
     
     def call(self, inputs):

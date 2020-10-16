@@ -25,7 +25,7 @@ def _benchmark(dataset, num_epochs=1, sleep=0.0):
 
 
 class DataContainer:
-    def __init__(self, root, category=None, train=True, augmentation=None, multi=False, batch_size=8, output_shape=[128, 128, 3], sample_frac=1.0, dtype=tf.float32):
+    def __init__(self, root, category=None, train=True, augmentation=None, multi=False, batch_size=8, output_shape=[128, 128, 3], sample_frac=1.0, dtype=tf.float32, cache_imgs=True):
         self._root = root
         self._augmentation = self._aug_params(augmentation)
         self._multi = multi
@@ -39,7 +39,7 @@ class DataContainer:
         if category is not None:
             df = df[df['location'] == category]
         df = df.sample(frac=sample_frac)
-        df['_img_files'] = df.apply(lambda r: [os.path.join(self._root, r['folder'], img_file) for img_file in r['file']], axis=1) 
+        df['_img_files'] = df.apply(lambda r: [str(self._root / r['folder'] / img_file) for img_file in r['file']], axis=1) 
         if not self._multi:
             df = df.explode('_img_files')
         self.df = df
@@ -47,8 +47,11 @@ class DataContainer:
         # Create the Dataset object
         ds = Dataset \
             .from_generator(self._generate_filenames(), (tf.string, self._dtype), (tf.TensorShape(self._output_shape[:-3]), tf.TensorShape([]))) \
-            .map(self._mapper(self._decode_img()), num_parallel_calls=AUTOTUNE) \
-            .cache()
+            .cache() \
+            .map(self._mapper(self._decode_img()), num_parallel_calls=AUTOTUNE)
+        
+        if cache_imgs:
+            ds = ds.cache()
 
         if self._augmentation is not None:
             ds = ds.map(self._tf_augmentation_func(), num_parallel_calls=AUTOTUNE)
@@ -137,7 +140,7 @@ class DataContainer:
         return f
     
     def _mura_meta(self):
-        df = pd.read_csv(os.path.join(self._root, 'MURA-v1.1', f'{"train" if self._train else "valid"}_image_paths.csv'), header=None, names=['full_path'])
+        df = pd.read_csv(self._root / 'MURA-v1.1' / f'{"train" if self._train else "valid"}_image_paths.csv', header=None, names=['full_path'])
 
         components = df['full_path'].str.split('/')
         df['folder'] = components.str[:-1].str.join('/')
@@ -172,7 +175,7 @@ class DataContainer:
                     img *= 1.0 / img.max()
 
                     axs[i, j].imshow(img)
-                    axs[i, j].set_title(label.numpy())
+                    axs[i, j].set_title(f'Label: {int(label.numpy())} Range: {("{0:.2f}".format(img.min()), "{0:.2f}".format(img.max()))}')
             else:
                 img = imgs.numpy().astype(np.float32)
 
