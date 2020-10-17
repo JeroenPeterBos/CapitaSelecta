@@ -25,19 +25,28 @@ class Mask(Layer):
 
 class DynamicMultiViewMeanCell(AbstractRNNCell):
     def build(self, input_shape):
-        self.units = input_shape[0][-1]
+        if not isinstance(input_shape[0], tuple):
+            self.masked = False
+            self.units = input_shape[-1]
+        else:
+            self.masked = True
+            self.units = input_shape[0][-1]
         self.built = True
         
     @property
     def state_size(self):
         return (self.units, 1)
     
-    def call(self, inputs_tuple, states):
+    def call(self, inputs, states):
         state, count = states
-        inputs, mask = inputs_tuple
 
-        new_state = tf.math.add(tf.math.multiply(inputs, mask), state)
-        new_count = tf.math.add(count, mask)
+        if self.masked:
+            inputs, mask = inputs
+            new_state = tf.math.add(tf.math.multiply(inputs, mask), state)
+            new_count = tf.math.add(count, mask)
+        else:
+            new_state = tf.math.add(inputs, state)
+            new_count = tf.math.add(count, tf.constant([1], dtype=K.floatx()))
 
         output = tf.math.divide(new_state, new_count)
         return output, (new_state, new_count)
@@ -45,17 +54,26 @@ class DynamicMultiViewMeanCell(AbstractRNNCell):
 
 class DynamicMultiViewMaxCell(AbstractRNNCell):
     def build(self, input_shape):
-        self.units = input_shape[-1]
+        if not isinstance(input_shape[0], tuple):
+            self.masked = False
+            self.units = input_shape[-1]
+        else:
+            self.masked = True
+            self.units = input_shape[0][-1]
         self.built = True
-        
+
     @property
     def state_size(self):
         return self.units
     
-    def call(self, inputs_tuple, states):
-        inputs, mask = inputs_tuple
+    def call(self, inputs, states):
+        state = states[0]
 
-        output = K.maximum(inputs, states[0])
+        if self.masked:
+            inputs, mask = inputs
+            inputs = tf.math.multiply(inputs, mask)
+
+        output = K.maximum(inputs, state)
         return output, output
 
 
