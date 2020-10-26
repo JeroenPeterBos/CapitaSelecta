@@ -52,6 +52,32 @@ class DynamicMultiViewMeanCell(AbstractRNNCell):
         return output, (new_state, new_count)
 
 
+class DynamicMultiViewSumCell(AbstractRNNCell):
+    def build(self, input_shape):
+        if not isinstance(input_shape[0], tuple):
+            self.masked = False
+            self.units = input_shape[-1]
+        else:
+            self.masked = True
+            self.units = input_shape[0][-1]
+        self.built = True
+
+    @property
+    def state_size(self):
+        return self.units
+
+    def call(self, inputs, states):
+        state = states[0]
+
+        if self.masked:
+            inputs, mask = inputs
+            new_state = tf.math.add(tf.math.multiply(inputs, mask), state)
+        else:
+            new_state = tf.math.add(inputs, state)
+
+        return new_state, new_state
+
+
 class DynamicMultiViewMaxCell(AbstractRNNCell):
     def build(self, input_shape):
         if not isinstance(input_shape[0], tuple):
@@ -81,12 +107,14 @@ class DynamicMultiViewRNN(RNN):
     def __init__(self, aggregation_type, **kwargs):
         if aggregation_type == 'max':
             cell = DynamicMultiViewMaxCell(**kwargs)
-        elif (aggregation_type == 'mean'):
+        elif aggregation_type == 'mean':
             cell = DynamicMultiViewMeanCell(**kwargs)
+        elif aggregation_type == 'sum':
+            cell = DynamicMultiViewSumCell(**kwargs)
         super().__init__(cell)
     
-    def call(self, inputs):
-        return super().call(inputs)
+    def call(self, inputs, **kwargs):
+        return super().call(inputs, **kwargs)
 
 
 class DynamicMultiViewRNNCell2D(AbstractRNNCell):

@@ -2,3 +2,6 @@ __pycache__
 target
 
 *-checkpoint.ipynb
+
+.idea
+.vscode

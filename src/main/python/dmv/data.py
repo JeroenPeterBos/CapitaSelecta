@@ -25,7 +25,19 @@ def _benchmark(dataset, num_epochs=1, sleep=0.0):
 
 
 class DataContainer:
-    def __init__(self, root, category=None, train=True, augmentation=None, multi=False, batch_size=8, output_shape=[128, 128, 3], sample_frac=1.0, dtype=tf.float32, cache_imgs=True):
+    def __init__(self,
+                 root,
+                 category=None,
+                 train=True,
+                 augmentation=None,
+                 multi=False,
+                 batch_size=8,
+                 output_shape=[128, 128, 3],
+                 sample_frac=1.0,
+                 dtype=tf.float32,
+                 cache_imgs=True,
+                 max_imgs=None,
+                 shuffle_size=-1):
         self._root = root
         self._augmentation = self._aug_params(augmentation)
         self._multi = multi
@@ -38,6 +50,9 @@ class DataContainer:
         df = self._mura_meta()
         if category is not None:
             df = df[df['location'] == category]
+        if max_imgs is not None:
+            df = df[df['file'].str.len() <= max_imgs]
+
         df = df.sample(frac=sample_frac)
         df['_img_files'] = df.apply(lambda r: [str(self._root / r['folder'] / img_file) for img_file in r['file']], axis=1) 
         if not self._multi:
@@ -60,6 +75,8 @@ class DataContainer:
 
         self.samples = self.df.shape[0]
         self.batches_per_epoch = math.ceil(self.samples / self._batch_size)
+
+        self.shuffle_size = self.samples if shuffle_size == -1 else shuffle_size
     
     @staticmethod
     def _aug_params(aug):
@@ -188,7 +205,7 @@ class DataContainer:
     
     def ds(self):
         return self._ds \
-            .shuffle(buffer_size=self.samples) \
+            .shuffle(buffer_size=self.shuffle_size) \
             .padded_batch(self._batch_size) \
             .prefetch(buffer_size=AUTOTUNE) \
             .repeat()
