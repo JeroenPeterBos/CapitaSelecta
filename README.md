@@ -3,7 +3,7 @@ Repository for research into DynamicMultiView models for my Capita Selecta assig
 
 Run `dmv.main.py`
 ```
-usage: parser.py [-h] [--data DATA] [--logs LOGS] [--category CATEGORY]
+usage: main.py [-h] [--data DATA] [--logs LOGS] [--category CATEGORY]
                  [--img-size IMG_SIZE IMG_SIZE IMG_SIZE]
                  [--batch-size BATCH_SIZE BATCH_SIZE]
                  [--cache-imgs CACHE_IMGS] [--max-imgs MAX_IMGS]

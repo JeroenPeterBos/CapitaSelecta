@@ -12,7 +12,15 @@ from pathlib import Path
 from dmv.experiment import load_data, experiment
 from dmv.parser import parse_args
 
+from tensorflow.python.client import device_lib
+
+
 logger = logging.getLogger()
+
+
+def get_available_gpus():
+    local_device_protos = device_lib.list_local_devices()
+    return [x.name for x in local_device_protos if x.device_type == 'GPU']
 
 
 def getSystemInfo():
@@ -28,6 +36,7 @@ def getSystemInfo():
         info['processor'] = platform.processor()
         info['ram'] = str(round(psutil.virtual_memory().total / (1024.0 ** 3))) + " GB"
         info['cores'] = multiprocessing.cpu_count()
+        info['gpus'] = get_available_gpus()
         info['python'] = sys.executable
         return info
     except Exception as e:
@@ -51,9 +60,15 @@ def setup_logger(log_dir):
     ch.setFormatter(formatter)
     fh.setFormatter(formatter)
 
-    # add ch to logger
+    # Add handlers to the default logger
     logger.addHandler(ch)
     logger.addHandler(fh)
+
+    # Add handlers to the file handler
+    tf_logger = logging.getLogger('tensorflow')
+    tf_logger.setLevel(logging.DEBUG)
+    tf_logger.addHandler(ch)
+    tf_logger.addHandler(fh)
 
 
 def describe_environment(args):
@@ -62,8 +77,6 @@ def describe_environment(args):
 
 
 def main(args):
-    setup_logger(args.logs)
-    describe_environment(args)
     logger.info("Starting a new experiment")
 
     train_dc, valid_dc = load_data(
@@ -91,5 +104,10 @@ def main(args):
 
 
 if __name__ == '__main__':
-    args = parse_args()
+    args, help_message = parse_args()
+    setup_logger(args.logs)
+    describe_environment(args)
+
+    logger.info(f'Usage: \n\n{help_message}')
+
     main(args)

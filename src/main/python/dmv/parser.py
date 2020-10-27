@@ -119,14 +119,14 @@ def get_model_from_str(python_path: str):
 
 
 def parse_args():
-    parser.print_help()
+    help_message = parser.format_help()
     args = parser.parse_args()
     args.multi = 'multi' in args.model
     args.model = get_model_from_str(args.model)
 
     args.logs = args.logs / ('multi' if args.multi else 'single') / args.run_id
 
-    return args
+    return args, help_message
 
 
 if __name__ == '__main__':

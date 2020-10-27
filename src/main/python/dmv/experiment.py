@@ -8,6 +8,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, CSVLogg
 
 from tensorflow_addons.metrics import CohenKappa
 
+from dmv.callback import EpochLogger
 from dmv.data import DataContainer
 
 
@@ -78,7 +79,6 @@ def experiment(
         TrueNegatives(name='true-neg'),
         FalsePositives(name='false-pos'),
         FalseNegatives(name='false-neg'),
-        Accuracy()
     ]
 
     # Define the weights of the classes
@@ -104,7 +104,9 @@ def experiment(
         ModelCheckpoint(monitor='val_loss', filepath=log_folder / 'checkpoints' / 'checkpoint', save_best_only=True),
 
         TensorBoard(log_dir=log_folder, histogram_freq=1),
-        CSVLogger(log_folder / 'log.csv')
+        CSVLogger(log_folder / 'log.csv'),
+
+        EpochLogger()
     ]
 
     model.fit(
@@ -114,5 +116,6 @@ def experiment(
         validation_steps=valid_dc.batches_per_epoch,
         epochs=max_epochs,
         class_weight=class_weights,
-        callbacks=callbacks
+        callbacks=callbacks,
+        verbose=0,
     )
