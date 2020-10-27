@@ -24,14 +24,14 @@ parser.add_argument(
 parser.add_argument(
     '--data',
     type=Path,
-    default=Path('/') / 'home' / 's1683047' / 'data' / 'full',
+    default=Path('/') / 'home' / 's1683047' / 'capita' / 'data' / 'full',
     help='Path to the MURA dataset.')
 
 # The location of the log data
 parser.add_argument(
     '--logs',
     type=Path,
-    default=Path('/') / 'home' / 's1683047' / 'logs' / 'phase_1',
+    default=Path('/') / 'home' / 's1683047' / 'capita' / 'logs' / 'phase_1',
     help='The base path to the logs.'
 )
 
