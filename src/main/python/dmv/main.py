@@ -9,6 +9,7 @@ import uuid
 import sys
 import io
 import pprint
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -79,6 +80,9 @@ def setup_logger(log_dir, redirect_err):
         sys.stderr.flush()
         err = open(log_err, 'a+')
         os.dup2(err.fileno(), sys.stderr.fileno())
+        
+        # sleep so we are more sure the logs end up in the right place
+        time.sleep(10)
 
 
 def describe_environment(args):
