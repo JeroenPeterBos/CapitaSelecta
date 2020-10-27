@@ -1,5 +1,6 @@
 import logging
 import multiprocessing
+import os
 import platform
 import psutil
 import re
@@ -47,7 +48,10 @@ def getSystemInfo():
 
 
 def setup_logger(log_dir):
-    log_file: Path = log_dir / f'log_{datetime.now().strftime("%m-%d_%H-%M")}.log'
+    log_base: Path = log_dir / f'log_{datetime.now().strftime("%m-%d_%H-%M")}'
+    log_file = log_base / 'out.log'
+    log_err = log_base / 'err.log'
+
     log_file.parent.mkdir(parents=True, exist_ok=True)
 
     logger.setLevel(logging.DEBUG)
@@ -73,10 +77,9 @@ def setup_logger(log_dir):
     tf_logger.addHandler(ch)
     tf_logger.addHandler(fh)
 
-    tf_logger_2 = tf.get_logger()
-    tf_logger_2.setLevel(logging.DEBUG)
-    tf_logger_2.addHandler(ch)
-    tf_logger_2.addHandler(fh)
+    sys.stderr.flush()
+    err = open(log_err, 'a+')
+    os.dup2(err.fileno(), sys.stderr.fileno())
 
 
 def describe_environment(args):
