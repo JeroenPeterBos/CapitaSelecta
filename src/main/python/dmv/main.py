@@ -116,6 +116,8 @@ def main(args):
             max_epochs=args.max_epochs
         )
 
+    logging.info("Finished experiment")
+
 
 if __name__ == '__main__':
     args, help_message = parse_args()
