@@ -1,10 +1,16 @@
+import logging
+import multiprocessing
+import platform
+import psutil
+import re
+import socket
+import uuid
+import sys
 from datetime import datetime
 from pathlib import Path
 
-from dmv.parser import parse_args
 from dmv.experiment import load_data, experiment
-
-import platform, socket, re, uuid, json, psutil, logging, multiprocessing
+from dmv.parser import parse_args
 
 logger = logging.getLogger()
 
@@ -22,6 +28,7 @@ def getSystemInfo():
         info['processor'] = platform.processor()
         info['ram'] = str(round(psutil.virtual_memory().total / (1024.0 ** 3))) + " GB"
         info['cores'] = multiprocessing.cpu_count()
+        info['python'] = sys.executable
         return info
     except Exception as e:
         logging.exception(e)
