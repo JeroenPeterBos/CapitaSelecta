@@ -1,7 +1,9 @@
 from typing import Callable, Tuple
 from pathlib import Path
 
-from tensorflow.keras.metrics import Accuracy, TruePositives, TrueNegatives, FalsePositives, FalseNegatives
+import tensorflow.keras.backend as K
+
+from tensorflow.keras.metrics import TruePositives, TrueNegatives, FalsePositives, FalseNegatives
 from tensorflow.keras.losses import BinaryCrossentropy
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, CSVLogger, ModelCheckpoint, TensorBoard
@@ -46,13 +48,12 @@ def load_data(
         'category': category,
         'batch_size': batch_size[int(multi)],
         'output_shape': list(img_shape),
-        'cache_imgs': cache_imgs,
         'max_imgs': max_imgs,
         'shuffle_size': shuffle_size
     }
 
-    train_dc = DataContainer(data_folder, multi=multi, train=True, augmentation=train_augmentation, **common)
-    valid_dc = DataContainer(data_folder, multi=True, train=False, **common)
+    train_dc = DataContainer(data_folder, multi=multi, train=True, cache_imgs=cache_imgs, augmentation=train_augmentation, **common)
+    valid_dc = DataContainer(data_folder, multi=True, train=False, cache_imgs=True, **common)
     return train_dc, valid_dc
 
 
@@ -74,7 +75,7 @@ def experiment(
     """
     # Define the metrics to track
     metrics = [
-        CohenKappa(name='cohen-kappa', num_classes=2),
+        CohenKappa(name='cohen-kappa', num_classes=2, dtype=K.floatx()),
         TruePositives(name='true-pos'),
         TrueNegatives(name='true-neg'),
         FalsePositives(name='false-pos'),

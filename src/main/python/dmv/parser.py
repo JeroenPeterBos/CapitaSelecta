@@ -63,9 +63,8 @@ parser.add_argument(
 
 # Caching imgs
 parser.add_argument(
-    '--cache-imgs',
-    type=bool,
-    default=True,
+    '--cache-data',
+    action='store_true',
     help='Whether to cache the images just before augmentation.'
 )
 

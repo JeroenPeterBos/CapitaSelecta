@@ -7,9 +7,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import tensorflow as tf
+import tensorflow.keras.backend as K
 from tensorflow.data import Dataset
 from tensorflow.data.experimental import AUTOTUNE
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 def _benchmark(dataset, num_epochs=1, sleep=0.0):
@@ -34,7 +38,7 @@ class DataContainer:
                  batch_size=8,
                  output_shape=[128, 128, 3],
                  sample_frac=1.0,
-                 dtype=tf.float32,
+                 dtype=None,
                  cache_imgs=True,
                  max_imgs=None,
                  shuffle_size=-1):
@@ -44,7 +48,7 @@ class DataContainer:
         self._batch_size = batch_size
         self._output_shape = [None] + output_shape if self._multi else output_shape
         self._train = train
-        self._dtype = dtype
+        self._dtype = dtype if dtype is not None else K.floatx()
 
         # Load the Meta Dataframe
         df = self._mura_meta()
@@ -53,19 +57,23 @@ class DataContainer:
         if max_imgs is not None:
             df = df[df['file'].str.len() <= max_imgs]
 
-        df = df.sample(frac=sample_frac)
+        if self._train:
+            df = df.sample(frac=sample_frac)
         df['_img_files'] = df.apply(lambda r: [str(self._root / r['folder'] / img_file) for img_file in r['file']], axis=1) 
         if not self._multi:
             df = df.explode('_img_files')
         self.df = df
+
+        logger.info(f'{self} contains {self.df.shape[0]} instances.')
 
         # Create the Dataset object
         ds = Dataset \
             .from_generator(self._generate_filenames(), (tf.string, self._dtype), (tf.TensorShape(self._output_shape[:-3]), tf.TensorShape([]))) \
             .cache() \
             .map(self._mapper(self._decode_img()), num_parallel_calls=AUTOTUNE)
-        
+
         if cache_imgs:
+            logger.info(f"Caching the images in dataset {self}")
             ds = ds.cache()
 
         if self._augmentation is not None:
@@ -77,7 +85,10 @@ class DataContainer:
         self.batches_per_epoch = math.ceil(self.samples / self._batch_size)
 
         self.shuffle_size = self.samples if shuffle_size == -1 else shuffle_size
-    
+
+    def __str__(self):
+        return f"<Dataset train:{self._train}, multi:{self._multi}>"
+
     @staticmethod
     def _aug_params(aug):
         if aug is not None:
@@ -136,14 +147,20 @@ class DataContainer:
         if self._multi:
             def f(image):
                 image = image.numpy()
+                dtype = image.dtype
+                image = image.astype('float32')
                 flip = random.randint(0, 1) == 0
                 for i in range(image.shape[0]):
                     image[i] = ImageDataGenerator().apply_transform(x=image[i], transform_parameters=self._augmentation(flip))
+                image = image.astype(dtype)
                 return image
         else:
             def f(image):
                 image = image.numpy()
+                dtype = image.dtype
+                image = image.astype('float32')
                 image = ImageDataGenerator().apply_transform(x=image, transform_parameters=self._augmentation())
+                image = image.astype(dtype)
                 return image
         return f
 
@@ -204,8 +221,11 @@ class DataContainer:
         plt.show()
     
     def ds(self):
-        return self._ds \
-            .shuffle(buffer_size=self.shuffle_size) \
+        ds = self._ds
+        if self._train:
+            ds = ds.shuffle(buffer_size=self.shuffle_size)
+
+        return ds \
             .padded_batch(self._batch_size) \
             .prefetch(buffer_size=AUTOTUNE) \
             .repeat()

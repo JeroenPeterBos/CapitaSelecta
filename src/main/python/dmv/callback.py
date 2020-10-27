@@ -5,7 +5,7 @@ import tensorflow as tf
 from tensorflow.keras.callbacks import Callback
 
 import logging
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 class EpochLogger(Callback):

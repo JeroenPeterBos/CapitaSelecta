@@ -6,6 +6,8 @@ import re
 import socket
 import uuid
 import sys
+import io
+import pprint
 from datetime import datetime
 from pathlib import Path
 
@@ -13,6 +15,7 @@ from dmv.experiment import load_data, experiment
 from dmv.parser import parse_args
 
 from tensorflow.python.client import device_lib
+import tensorflow as tf
 
 
 logger = logging.getLogger()
@@ -70,10 +73,21 @@ def setup_logger(log_dir):
     tf_logger.addHandler(ch)
     tf_logger.addHandler(fh)
 
+    tf_logger_2 = tf.get_logger()
+    tf_logger_2.setLevel(logging.DEBUG)
+    tf_logger_2.addHandler(ch)
+    tf_logger_2.addHandler(fh)
+
 
 def describe_environment(args):
-    logger.info(f"The system we are running on: \n\n{getSystemInfo()}")
-    logger.info(f"The parameters describing the run are :\n\n{vars(args)}")
+    system = io.StringIO()
+    params = io.StringIO()
+
+    pprint.pprint(getSystemInfo(), stream=system)
+    pprint.pprint(vars(args), stream=params)
+
+    logger.info(f"The system we are running on: \n{system.getvalue()}")
+    logger.info(f"The parameters describing the run are :\n{params.getvalue()}")
 
 
 def main(args):
@@ -85,7 +99,7 @@ def main(args):
         img_shape=args.img_size,
         batch_size=args.batch_size,
         category=args.category,
-        cache_imgs=args.cache_imgs,
+        cache_imgs=args.cache_data,
         max_imgs=args.max_imgs,
         shuffle_size=args.shuffle_size
     )
