@@ -5,10 +5,10 @@ Run `dmv.main.py`
 ```
 usage: main.py [-h] [--data DATA] [--logs LOGS] [--category CATEGORY]
                  [--img-size IMG_SIZE IMG_SIZE IMG_SIZE]
-                 [--batch-size BATCH_SIZE BATCH_SIZE]
-                 [--cache-imgs CACHE_IMGS] [--max-imgs MAX_IMGS]
-                 [--max-epochs MAX_EPOCHS] [--replication REPLICATION]
-                 [--shuffle-size SHUFFLE_SIZE]
+                 [--batch-size BATCH_SIZE BATCH_SIZE] [--cache-data]
+                 [--max-imgs MAX_IMGS] [--max-epochs MAX_EPOCHS]
+                 [--replication REPLICATION] [--shuffle-size SHUFFLE_SIZE]
+                 [--redirect-err]
                  model run_id
 
 Run a dynamic multi view research experiment.
@@ -28,8 +28,7 @@ optional arguments:
                         The image resolution to train the network on.
   --batch-size BATCH_SIZE BATCH_SIZE
                         The single and multi view batch_size.
-  --cache-imgs CACHE_IMGS
-                        Whether to cache the images just before augmentation.
+  --cache-data          Whether to cache the images just before augmentation.
   --max-imgs MAX_IMGS   The maximum number of images a study is allowed to
                         contain.
   --max-epochs MAX_EPOCHS
@@ -39,4 +38,6 @@ optional arguments:
                         The number of times to replicate the experiment.
   --shuffle-size SHUFFLE_SIZE
                         Shuffle size in samples. (-1 for full shuffle)
+  --redirect-err        Redirect all the logs (also .cc/cpp) to a file, the
+                        stderr will be hijacked so the stream will be gone.
 ```

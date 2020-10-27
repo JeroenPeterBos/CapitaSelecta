@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from datetime import datetime
 from pathlib import Path
 
 import dmv.models as dmv_models
@@ -100,6 +101,13 @@ parser.add_argument(
     help='Shuffle size in samples. (-1 for full shuffle)'
 )
 
+# Redirect all the logs, also the tensorflow cpp logs to a file
+parser.add_argument(
+    '--redirect-err',
+    action='store_true',
+    help='Redirect all the logs (also .cc/cpp) to a file, the stderr will be hijacked so the stream will be gone.'
+)
+
 
 def get_model_from_str(python_path: str):
     """
@@ -123,11 +131,13 @@ def parse_args():
     args.multi = 'multi' in args.model
     args.model = get_model_from_str(args.model)
 
-    args.logs = args.logs / ('multi' if args.multi else 'single') / args.run_id
+    args.logs = args.logs / ('multi' if args.multi else 'single') / args.run_id / f'{datetime.now().strftime("%m-%d_%H-%M")}'
 
     return args, help_message
 
 
 if __name__ == '__main__':
     import pprint
-    pprint.pprint(vars(parse_args()))
+    args, help_message = parse_args()
+    print(help_message)
+    pprint.pprint(vars(args))

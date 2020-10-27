@@ -47,11 +47,8 @@ def getSystemInfo():
         logging.exception(e)
 
 
-def setup_logger(log_dir):
-    log_base: Path = log_dir / f'log_{datetime.now().strftime("%m-%d_%H-%M")}'
-    log_file = log_base / 'out.log'
-    log_err = log_base / 'err.log'
-
+def setup_logger(log_dir, redirect_err):
+    log_file = log_dir / 'out.log'
     log_file.parent.mkdir(parents=True, exist_ok=True)
 
     logger.setLevel(logging.DEBUG)
@@ -77,9 +74,11 @@ def setup_logger(log_dir):
     tf_logger.addHandler(ch)
     tf_logger.addHandler(fh)
 
-    sys.stderr.flush()
-    err = open(log_err, 'a+')
-    os.dup2(err.fileno(), sys.stderr.fileno())
+    if redirect_err:
+        log_err = log_dir / 'err.log'
+        sys.stderr.flush()
+        err = open(log_err, 'a+')
+        os.dup2(err.fileno(), sys.stderr.fileno())
 
 
 def describe_environment(args):
@@ -108,7 +107,7 @@ def main(args):
     )
 
     for i in range(args.replication):
-        log = args.logs / datetime.now().strftime("%m-%d_%H-%M")
+        log = args.logs / f'run_{i}'
         logger.info(f"___ Running replication {i} out of {args.replication} which will be logged to: '{log}'.")
 
         experiment(
@@ -124,7 +123,7 @@ def main(args):
 
 if __name__ == '__main__':
     args, help_message = parse_args()
-    setup_logger(args.logs)
+    setup_logger(args.logs, args.redirect_err)
     describe_environment(args)
 
     logger.info(f'Usage: \n\n{help_message}')
