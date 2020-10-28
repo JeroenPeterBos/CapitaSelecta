@@ -3,6 +3,11 @@ from tensorflow.python.keras.layers.convolutional_recurrent import ConvRNN2D
 import tensorflow.keras.backend as K
 import tensorflow as tf
 from tensorflow.python.framework import tensor_shape
+from dmv import layer_serialization
+
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 class Mask(Layer):
@@ -104,7 +109,8 @@ class DynamicMultiViewMaxCell(AbstractRNNCell):
 
 
 class DynamicMultiViewRNN(RNN):
-    def __init__(self, aggregation_type, **kwargs):
+    def __init__(self, aggregation_type: str = 'mean', **kwargs):
+        self.aggregation_type = aggregation_type
         if aggregation_type == 'max':
             cell = DynamicMultiViewMaxCell(**kwargs)
         elif aggregation_type == 'mean':
@@ -112,9 +118,20 @@ class DynamicMultiViewRNN(RNN):
         elif aggregation_type == 'sum':
             cell = DynamicMultiViewSumCell(**kwargs)
         super().__init__(cell)
+
+    def get_config(self):
+        config = super().get_config().copy()
+        config.update({
+            'aggregation_type': self.aggregation_type
+        })
+        return config
     
     def call(self, inputs, **kwargs):
         return super().call(inputs, **kwargs)
+
+    @property
+    def _trackable_saved_model_saver(self):
+        return layer_serialization.CustomRNNSavedModelSaver(self)
 
 
 class DynamicMultiViewRNNCell2D(AbstractRNNCell):

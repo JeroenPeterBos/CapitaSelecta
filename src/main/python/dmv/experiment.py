@@ -3,6 +3,7 @@ from pathlib import Path
 
 import tensorflow.keras.backend as K
 
+from tensorflow.keras.models import load_model
 from tensorflow.keras.metrics import TruePositives, TrueNegatives, FalsePositives, FalseNegatives
 from tensorflow.keras.losses import BinaryCrossentropy
 from tensorflow.keras.optimizers import Adam
@@ -12,6 +13,10 @@ from tensorflow_addons.metrics import CohenKappa
 
 from dmv.callback import EpochLogger
 from dmv.data import DataContainer
+from dmv.layer import DynamicMultiViewRNN
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 def load_data(
@@ -62,7 +67,9 @@ def experiment(
         valid_dc: DataContainer,
         log_folder: Path,
         model_class: Callable,
-        max_epochs=100):
+        max_epochs: int = 100,
+        tensorboard: bool = False,
+        checkpoint: bool = False):
     """
     Run an experiment with the given data and model and log the results.
 
@@ -72,10 +79,12 @@ def experiment(
         log_folder: The directory to store the results
         model_class: Class to instantiate a model from
         max_epochs: Maximum number of epoch to train for
+        tensorboard: Store epoch and batch results in tensorboard format
+        checkpoint: Store the best model at the end of epochs
     """
     # Define the metrics to track
     metrics = [
-        CohenKappa(name='cohen-kappa', num_classes=2, dtype=K.floatx()),
+        CohenKappa(name='cohen-kappa', num_classes=2),
         TruePositives(name='true-pos'),
         TrueNegatives(name='true-neg'),
         FalsePositives(name='false-pos'),
@@ -100,15 +109,18 @@ def experiment(
 
     # Define the callbacks
     callbacks = [
-        EarlyStopping(monitor='val_loss', patience=15, verbose=1, min_delta=1e-4, mode='min'),
-        ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=7, verbose=1, min_delta=1e-4, mode='min'),
-        ModelCheckpoint(monitor='val_loss', filepath=log_folder / 'checkpoints' / 'checkpoint', save_best_only=True),
+        EarlyStopping(monitor='val_loss', patience=11, verbose=1, min_delta=1e-4, mode='min'),
+        ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=5, verbose=1, min_delta=1e-4, mode='min'),
 
-        TensorBoard(log_dir=log_folder, histogram_freq=1),
         CSVLogger(log_folder / 'log.csv'),
-
         EpochLogger()
     ]
+
+    if tensorboard:
+        callbacks.append(TensorBoard(log_dir=log_folder, histogram_freq=1))
+
+    if checkpoint:
+        callbacks.append(ModelCheckpoint(monitor='val_loss', filepath=log_folder / 'saves' / 'checkpoints', save_best_only=False))
 
     model.fit(
         x=train_dc.ds(),
@@ -120,3 +132,14 @@ def experiment(
         callbacks=callbacks,
         verbose=0,
     )
+
+    model.save(log_folder / 'saves' / 'final')
+    return model
+
+
+def validate_saved_model(model, log_folder, valid_dc):
+    m = load_model(log_folder / 'saves' / 'final', custom_objects={'CohenKappa': CohenKappa, 'DynamicMultiViewRNN': DynamicMultiViewRNN})
+
+    logger.info(model.evaluate(valid_dc.ds(), steps=valid_dc.batches_per_epoch, return_dict=True))
+    logger.info(m.evaluate(valid_dc.ds(), steps=valid_dc.batches_per_epoch, return_dict=True))
+

@@ -107,8 +107,9 @@ def main(args):
         shuffle_size=args.shuffle_size
     )
 
-    for i in range(args.replication):
+    for i in range(1, args.replication + 1):
         log = args.logs / f'run_{i}'
+        log.mkdir(parents=True, exist_ok=True)
         logger.info(f"___ Running replication {i} out of {args.replication} which will be logged to: '{log}'.")
 
         experiment(
@@ -116,7 +117,9 @@ def main(args):
             valid_dc=valid_dc,
             log_folder=log,
             model_class=args.model,
-            max_epochs=args.max_epochs
+            max_epochs=args.max_epochs,
+            tensorboard=args.tensorboard,
+            checkpoint=args.checkpoint
         )
 
     logging.info("Finished experiment")

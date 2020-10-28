@@ -38,6 +38,9 @@ class MultiEvalModel(Model, ABC):
 class MuraSingleViewModel(MultiEvalModel):
     def __init__(self, num_classes, input_shape):
         super().__init__()
+        self.num_classes = num_classes
+        self.my_input_shape = input_shape
+
         self.base = DenseNet121(include_top=False, input_shape=input_shape, pooling='avg')
         for index, layer in enumerate(self.base.layers):
             layer.trainable = True
@@ -45,7 +48,11 @@ class MuraSingleViewModel(MultiEvalModel):
         self.classify = Dense(num_classes, activation='sigmoid', name='classify')
 
     def get_config(self):
-        pass
+        config = super().get_config().copy()
+        config.update({
+            'num_classes': self.num_classes,
+            'input_shape': self.my_input_shape
+        })
 
     def call(self, inputs, **kwargs):
         x = self.base(inputs)

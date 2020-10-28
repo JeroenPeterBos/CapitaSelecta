@@ -108,6 +108,18 @@ parser.add_argument(
     help='Redirect all the logs (also .cc/cpp) to a file, the stderr will be hijacked so the stream will be gone.'
 )
 
+parser.add_argument(
+    '--tensorboard',
+    action='store_true',
+    help='Store results in tensorboard files'
+)
+
+parser.add_argument(
+    '--checkpoint',
+    action='store_true',
+    help='Checkpoint the best model at the end of the epoch.'
+)
+
 
 def get_model_from_str(python_path: str):
     """
