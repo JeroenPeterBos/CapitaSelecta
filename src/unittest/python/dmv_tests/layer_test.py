@@ -17,6 +17,13 @@ class MaskTest(tf.test.TestCase):
 
         self.assertAllEqual(mask_tensor, mask_res)
 
+    def test_mask_core_principle(self):
+        inputs = tf.constant([[1], [2], [3], [4]], dtype=tf.float32)
+        mask = tf.constant([[0], [1], [1], [0]], dtype=tf.float32)
+
+        self.assertAllEqual(tf.math.multiply(inputs, mask), tf.constant([[0], [2], [3], [0]]))
+        self.assertAllEqual(tf.math.add(tf.ones([4, 1], dtype=tf.float32), mask), tf.constant([[1], [2], [2], [1]]))
+
 
 class DynamicMultiViewRNNTest(tf.test.TestCase):
     def setUp(self):

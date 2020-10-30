@@ -57,7 +57,7 @@ class DataContainer:
         if max_imgs is not None:
             df = df[df['file'].str.len() <= max_imgs]
 
-        if self._train:
+        if self._train and sample_frac >= 0.0:
             df = df.sample(frac=sample_frac)
         df['_img_files'] = df.apply(lambda r: [str(self._root / r['folder'] / img_file) for img_file in r['file']], axis=1) 
         if not self._multi:
@@ -69,9 +69,9 @@ class DataContainer:
         # Create the Dataset object
         ds = Dataset \
             .from_generator(self._generate_filenames(), (tf.string, self._dtype), (tf.TensorShape(self._output_shape[:-3]), tf.TensorShape([]))) \
-            .cache() \
-            .map(self._mapper(self._decode_img()), num_parallel_calls=AUTOTUNE)
+            .cache()
 
+        ds = ds.map(self._mapper(self._decode_img()), num_parallel_calls=AUTOTUNE)
         if cache_imgs:
             logger.info(f"Caching the images in dataset {self}")
             ds = ds.cache()
@@ -222,10 +222,13 @@ class DataContainer:
     
     def ds(self):
         ds = self._ds
-        if self._train:
+        if self._train and self.shuffle_size != 0:
             ds = ds.shuffle(buffer_size=self.shuffle_size)
 
         return ds \
             .padded_batch(self._batch_size) \
             .prefetch(buffer_size=AUTOTUNE) \
             .repeat()
+
+    def __len__(self):
+        return self.df.shape[0]
