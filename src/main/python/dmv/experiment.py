@@ -8,6 +8,7 @@ from tensorflow.keras.metrics import TruePositives, TrueNegatives, FalsePositive
 from tensorflow.keras.losses import BinaryCrossentropy
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, CSVLogger, ModelCheckpoint, TensorBoard
+from tensorflow.python.keras import Model
 
 from tensorflow_addons.metrics import CohenKappa
 
@@ -120,7 +121,7 @@ def experiment(
         callbacks.append(TensorBoard(log_dir=log_folder, histogram_freq=1))
 
     if checkpoint:
-        callbacks.append(ModelCheckpoint(monitor='val_loss', filepath=log_folder / 'saves' / 'checkpoints', save_best_only=False))
+        callbacks.append(ModelCheckpoint(monitor='val_loss', filepath=log_folder / 'saves' / 'checkpoints', save_best_only=True))
 
     model.fit(
         x=train_dc.ds(),
@@ -137,9 +138,21 @@ def experiment(
     return model
 
 
+def evaluate_in_multi_mode(
+        model: Model,
+        dc: DataContainer,
+        log_folder: Path):
+    final = model.evaluate(dc.ds(), steps=dc.batches_per_epoch, return_dict=True, verbose=0)
+    logger.info(f'Final model performance on {dc}: {final}')
+
+    model.load_weights(log_folder / 'saves' / 'checkpoints')
+    best = model.evaluate(dc.ds(), steps=dc.batches_per_epoch, return_dict=True, verbose=0)
+    logger.info(f'Best model performance on {dc}: {best}')
+
+
 def validate_saved_model(model, log_folder, valid_dc):
     m = load_model(log_folder / 'saves' / 'final', custom_objects={'CohenKappa': CohenKappa, 'DynamicMultiViewRNN': DynamicMultiViewRNN})
 
-    logger.info(model.evaluate(valid_dc.ds(), steps=valid_dc.batches_per_epoch, return_dict=True))
-    logger.info(m.evaluate(valid_dc.ds(), steps=valid_dc.batches_per_epoch, return_dict=True))
+    logger.info(model.evaluate(valid_dc.ds(), steps=valid_dc.batches_per_epoch, return_dict=True, verbose=0))
+    logger.info(m.evaluate(valid_dc.ds(), steps=valid_dc.batches_per_epoch, return_dict=True, verbose=0))
 

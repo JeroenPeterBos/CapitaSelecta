@@ -13,7 +13,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from dmv.experiment import load_data, experiment
+from dmv.experiment import load_data, experiment, evaluate_in_multi_mode
 from dmv.parser import parse_args
 
 from tensorflow.python.client import device_lib
@@ -112,7 +112,7 @@ def main(args):
         log.mkdir(parents=True, exist_ok=True)
         logger.info(f"___ Running replication {i} out of {args.replication} which will be logged to: '{log}'.")
 
-        experiment(
+        model = experiment(
             train_dc=train_dc,
             valid_dc=valid_dc,
             log_folder=log,
@@ -121,6 +121,21 @@ def main(args):
             tensorboard=args.tensorboard,
             checkpoint=args.checkpoint
         )
+
+        if not args.multi:
+            train_dc, valid_dc = load_data(
+                data_folder=args.data,
+                multi=True,
+                img_shape=args.img_size,
+                batch_size=args.batch_size,
+                category=args.category,
+                cache_imgs=False,
+                max_imgs=args.max_imgs,
+                shuffle_size=0
+            )
+
+        evaluate_in_multi_mode(model, train_dc, log)
+        evaluate_in_multi_mode(model, valid_dc, log)
 
     logging.info("Finished experiment")
 
