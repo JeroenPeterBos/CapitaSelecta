@@ -1,4 +1,5 @@
 from tensorflow.keras.layers import AbstractRNNCell, RNN, Layer
+import tensorflow.keras.activations as activations
 from tensorflow.python.keras.layers.convolutional_recurrent import ConvRNN2D
 import tensorflow.keras.backend as K
 import tensorflow as tf
@@ -161,3 +162,93 @@ class DynamicMultiViewRNN2D(ConvRNN2D):
     
     def call(self, inputs):
         return super().call(inputs)
+
+
+class LogNormCell(Layer):
+    def __init__(self,
+                 pre_activation='softplus',
+                 post_activation='sigmoid',
+                 **kwargs):
+        self._pre_activation = activations.deserialize(pre_activation)
+        self._post_activation = activations.deserialize(post_activation)
+        super().__init__(**kwargs)
+
+    def build(self, input_shapes):
+        if not isinstance(input_shapes[0], tuple):
+            self.masked = False
+            self._input_neurons = input_shapes[-1]
+        else:
+            self.masked = True
+            self._input_neurons = input_shapes[0][-1]
+
+        #self._w = tf.constant(value=1, dtype=K.floatx(), shape=(self._input_neurons, 1))
+        # self._q = tf.constant(value=1, dtype=K.floatx(), shape=(1, 1))
+        # self._bias = tf.constant(value=0, dtype=K.floatx(), shape=(1, 1))
+        self._w = self.add_weight(
+            shape=(self._input_neurons, 1),
+            initializer='glorot_uniform',
+            name='w',
+        )
+        self._q = self.add_weight(
+            shape=(1, 1),
+            initializer='glorot_uniform',
+            name='q'
+        )
+        self._bias = self.add_weight(
+            shape=(1, 1),
+            initializer='zeros',
+            name='bias'
+        )
+
+    @property
+    def state_size(self):
+        return [tf.TensorShape([self._input_neurons]), tf.TensorShape([1])]
+
+    @property
+    def output_size(self):
+        return [tf.TensorShape([self._input_neurons])]
+
+    def call(self, inputs, states):
+        state, count = states
+
+        if self.masked:
+            inputs, mask = inputs
+
+        x = self._pre_activation(inputs)
+
+        # Aggregate
+        if self.masked:
+            x = tf.math.multiply(x, mask, name='apply_mask')
+            c = tf.math.add(count, mask, name='count_increment')
+        else:
+            c = tf.math.add(count, tf.constant([1], dtype=K.floatx()), name='count_increment')
+        s = tf.math.add(x, state, name='sum_state')
+
+        #tf.print("JERONE")
+        #tf.print(c)
+        #tf.print(x)
+
+        # Log transform and apply dense
+        x = tf.math.subtract(
+            tf.math.multiply(tf.math.log(s, name='x_log_transform'), self._w, name='x_apply_weights'),
+            tf.math.multiply(tf.math.log(c, name='c_log_transform'), self._q, name='c_apply_weights'),
+            name='dense_linear'
+        )
+        #tf.print(x)
+        x = tf.math.add(
+            x,
+            self._bias,
+            name='dense_bias'
+        )
+        #tf.print(x)
+
+        x = self._post_activation(x)
+
+        #tf.print(x)
+        return x, (s, c)
+
+    def get_config(self):
+        return {
+            "pre_activation": self._pre_activation,
+            "post_activation": self._post_activation,
+        }
