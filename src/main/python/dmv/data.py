@@ -87,7 +87,12 @@ class DataContainer:
         self.shuffle_size = self.samples if shuffle_size == -1 else shuffle_size
 
     def __str__(self):
-        return f"<Dataset train:{self._train}, multi:{self._multi}>"
+        multi_str = 'Multi-view' if self._multi else 'Single-view'
+        train_str = 'Train' if self._train else 'Validation'
+        return f"'{multi_str} {train_str} Dataset'"
+
+    def __repr__(self):
+        return f"Dataset(multi={self._multi}, train={self._train})"
 
     @staticmethod
     def _aug_params(aug):

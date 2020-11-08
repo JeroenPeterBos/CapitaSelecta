@@ -99,9 +99,13 @@ def experiment(
     }
 
     # Construct the model
-    model = model_class(1, train_dc._output_shape[-3:])
+    instantiation_shape = train_dc._output_shape[-3:]
+    logging.info(f"Instantiating the model with input shape: {instantiation_shape}")
+    model: Model = model_class(1, instantiation_shape)
 
-    model.build(tuple([train_dc._batch_size] + train_dc._output_shape))
+    build_shape =tuple([train_dc._batch_size] + train_dc._output_shape)
+    logging.info(f"Building the model with input shape: {build_shape}")
+    model.build(build_shape)
     model.compile(
         optimizer=Adam(0.0001, beta_1=0.9, beta_2=0.999),
         metrics=metrics,
@@ -118,9 +122,11 @@ def experiment(
     ]
 
     if tensorboard:
+        logging.info("Activated tensorboard monitor")
         callbacks.append(TensorBoard(log_dir=log_folder, histogram_freq=1))
 
     if checkpoint:
+        logging.info("Activated checkpoints callback")
         callbacks.append(ModelCheckpoint(monitor='val_loss', filepath=log_folder / 'saves' / 'checkpoints', save_best_only=True))
 
     model.fit(
@@ -134,24 +140,28 @@ def experiment(
         verbose=0,
     )
 
-    model.save(log_folder / 'saves' / 'final')
+    model.save_weights(log_folder / 'saves' / 'final_weights')
+    model.save(log_folder / 'saves' / 'final_model')
     return model
 
 
 def evaluate_in_multi_mode(
         model: Model,
         dc: DataContainer,
-        log_folder: Path):
+        log_folder: Path,
+        checkpoint: bool):
+    model.load_weights(log_folder / 'saves' / 'final_weights')
     final = model.evaluate(dc.ds(), steps=dc.batches_per_epoch, return_dict=True, verbose=0)
     logger.info(f'Final model performance on {dc}: {final}')
 
-    model.load_weights(log_folder / 'saves' / 'checkpoints')
-    best = model.evaluate(dc.ds(), steps=dc.batches_per_epoch, return_dict=True, verbose=0)
-    logger.info(f'Best model performance on {dc}: {best}')
+    if checkpoint:
+        model.load_weights(log_folder / 'saves' / 'checkpoints')
+        best = model.evaluate(dc.ds(), steps=dc.batches_per_epoch, return_dict=True, verbose=0)
+        logger.info(f'Best model performance on {dc}: {best}')
 
 
 def validate_saved_model(model, log_folder, valid_dc):
-    m = load_model(log_folder / 'saves' / 'final', custom_objects={'CohenKappa': CohenKappa, 'DynamicMultiViewRNN': DynamicMultiViewRNN})
+    m = load_model(log_folder / 'saves' / 'final_model', custom_objects={'CohenKappa': CohenKappa, 'DynamicMultiViewRNN': DynamicMultiViewRNN})
 
     logger.info(model.evaluate(valid_dc.ds(), steps=valid_dc.batches_per_epoch, return_dict=True, verbose=0))
     logger.info(m.evaluate(valid_dc.ds(), steps=valid_dc.batches_per_epoch, return_dict=True, verbose=0))

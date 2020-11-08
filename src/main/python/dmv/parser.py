@@ -58,7 +58,7 @@ parser.add_argument(
     '--batch-size',
     type=int,
     nargs=2,
-    default=[8, 4],
+    default=[8, 8],
     help='The single and multi view batch_size.'
 )
 

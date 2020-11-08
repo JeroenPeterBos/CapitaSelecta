@@ -17,6 +17,7 @@ from dmv.experiment import load_data, experiment, evaluate_in_multi_mode
 from dmv.parser import parse_args
 
 from tensorflow.python.client import device_lib
+from tensorflow.keras.models import clone_model
 import tensorflow as tf
 
 
@@ -96,7 +97,7 @@ def describe_environment(args):
 def main(args):
     logger.info("Starting a new experiment")
 
-    train_dc, valid_dc = load_data(
+    global_train_dc, global_valid_dc = load_data(
         data_folder=args.data,
         multi=args.multi,
         img_shape=args.img_size,
@@ -111,6 +112,8 @@ def main(args):
         log = args.logs / f'run_{i}'
         log.mkdir(parents=True, exist_ok=True)
         logger.info(f"___ Running replication {i} out of {args.replication} which will be logged to: '{log}'.")
+
+        train_dc, valid_dc = global_train_dc, global_valid_dc
 
         model = experiment(
             train_dc=train_dc,
@@ -134,8 +137,8 @@ def main(args):
                 shuffle_size=0
             )
 
-        evaluate_in_multi_mode(model, train_dc, log)
-        evaluate_in_multi_mode(model, valid_dc, log)
+        evaluate_in_multi_mode(model, valid_dc, log, checkpoint=args.checkpoint)
+        evaluate_in_multi_mode(model, train_dc, log, checkpoint=args.checkpoint)
 
     logging.info("Finished experiment")
 
