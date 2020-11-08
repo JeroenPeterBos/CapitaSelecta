@@ -35,7 +35,7 @@ class MultiEvalModel(Model, ABC):
         return {m.name: m.result() for m in self.metrics}
 
 
-class MuraSingleViewModel(MultiEvalModel):
+class Mura(MultiEvalModel):
     def __init__(self, num_classes, input_shape):
         super().__init__()
         self.num_classes = num_classes
