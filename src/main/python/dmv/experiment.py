@@ -14,7 +14,6 @@ from tensorflow_addons.metrics import CohenKappa
 
 from dmv.callback import EpochLogger
 from dmv.data import DataContainer
-from dmv.layer import DynamicMultiViewRNN
 
 import logging
 logger = logging.getLogger(__name__)
@@ -161,7 +160,7 @@ def evaluate_in_multi_mode(
 
 
 def validate_saved_model(model, log_folder, valid_dc):
-    m = load_model(log_folder / 'saves' / 'final_model', custom_objects={'CohenKappa': CohenKappa, 'DynamicMultiViewRNN': DynamicMultiViewRNN})
+    m = load_model(log_folder / 'saves' / 'final_model', custom_objects={'CohenKappa': CohenKappa})
 
     logger.info(model.evaluate(valid_dc.ds(), steps=valid_dc.batches_per_epoch, return_dict=True, verbose=0))
     logger.info(m.evaluate(valid_dc.ds(), steps=valid_dc.batches_per_epoch, return_dict=True, verbose=0))
