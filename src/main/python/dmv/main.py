@@ -120,9 +120,7 @@ def main(args):
             valid_dc=valid_dc,
             log_folder=log,
             model_class=args.model,
-            max_epochs=args.max_epochs,
-            tensorboard=args.tensorboard,
-            checkpoint=args.checkpoint
+            args=args
         )
 
         if not args.multi:

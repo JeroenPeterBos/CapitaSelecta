@@ -120,6 +120,13 @@ parser.add_argument(
     help='Checkpoint the best model at the end of the epoch.'
 )
 
+parser.add_argument(
+    '--learning-rate',
+    type=float,
+    default=0.0001,
+    help='The learning rate of the optimizer'
+)
+
 
 def get_model_from_str(python_path: str):
     """

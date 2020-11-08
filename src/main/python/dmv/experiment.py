@@ -1,3 +1,4 @@
+from argparse import Namespace
 from typing import Callable, Tuple
 from pathlib import Path
 
@@ -67,9 +68,7 @@ def experiment(
         valid_dc: DataContainer,
         log_folder: Path,
         model_class: Callable,
-        max_epochs: int = 100,
-        tensorboard: bool = False,
-        checkpoint: bool = False):
+        args: Namespace):
     """
     Run an experiment with the given data and model and log the results.
 
@@ -78,9 +77,7 @@ def experiment(
         valid_dc: Validation data container
         log_folder: The directory to store the results
         model_class: Class to instantiate a model from
-        max_epochs: Maximum number of epoch to train for
-        tensorboard: Store epoch and batch results in tensorboard format
-        checkpoint: Store the best model at the end of epochs
+        args: The job arguments to run with
     """
     # Define the metrics to track
     metrics = [
@@ -106,25 +103,25 @@ def experiment(
     logging.info(f"Building the model with input shape: {build_shape}")
     model.build(build_shape)
     model.compile(
-        optimizer=Adam(0.0001, beta_1=0.9, beta_2=0.999),
+        optimizer=Adam(args.learning_rate, beta_1=0.9, beta_2=0.999),
         metrics=metrics,
         loss=BinaryCrossentropy()
     )
 
     # Define the callbacks
     callbacks = [
-        EarlyStopping(monitor='val_loss', patience=11, verbose=1, min_delta=1e-4, mode='min'),
-        ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=5, verbose=1, min_delta=1e-4, mode='min'),
+        EarlyStopping(monitor='val_loss', patience=15, verbose=1, min_delta=1e-4, mode='min'),
+        ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=5, verbose=1, min_delta=1e-4, mode='min', cooldown=3),
 
         CSVLogger(log_folder / 'log.csv'),
         EpochLogger()
     ]
 
-    if tensorboard:
+    if args.tensorboard:
         logging.info("Activated tensorboard monitor")
         callbacks.append(TensorBoard(log_dir=log_folder, histogram_freq=1))
 
-    if checkpoint:
+    if args.checkpoint:
         logging.info("Activated checkpoints callback")
         callbacks.append(ModelCheckpoint(monitor='val_loss', filepath=log_folder / 'saves' / 'checkpoints', save_best_only=True))
 
@@ -133,7 +130,7 @@ def experiment(
         steps_per_epoch=train_dc.batches_per_epoch,
         validation_data=valid_dc.ds(),
         validation_steps=valid_dc.batches_per_epoch,
-        epochs=max_epochs,
+        epochs=args.max_epochs,
         class_weight=class_weights,
         callbacks=callbacks,
         verbose=0,
