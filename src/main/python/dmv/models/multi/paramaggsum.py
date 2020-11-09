@@ -1,6 +1,6 @@
 from tensorflow.python.keras import Model
 from tensorflow.python.keras.applications.densenet import DenseNet121
-from tensorflow.python.keras.layers import Dense, TimeDistributed, RNN, Layer, Masking
+from tensorflow.python.keras.layers import Dense, TimeDistributed, RNN, Layer, Masking, MaxPooling2D
 from tensorflow.python.keras import activations
 import tensorflow as tf
 import tensorflow.keras.backend as K
@@ -24,19 +24,24 @@ class ParamAggCell(Layer):
         self._input_neurons = input_shapes[-1]
 
         self._w = self.add_weight(
-            shape=(1, 1),
+            shape=(self._input_neurons,),
             initializer='ones',
             name='weights'
         )
+        self._q = self.add_weight(
+            shape=(self._input_neurons,),
+            initializer='zeros',
+            name='weights'
+        )
         self._bias = self.add_weight(
-            shape=(1, 1),
+            shape=(self._input_neurons,),
             initializer='zeros',
             name='bias'
         )
 
     @property
     def state_size(self):
-        return [tf.TensorShape([self._input_neurons]), tf.TensorShape([1])]
+        return [tf.TensorShape([self._input_neurons]), tf.TensorShape([self._input_neurons])]
 
     @property
     def output_size(self):
@@ -56,8 +61,9 @@ class ParamAggCell(Layer):
         s = tf.math.add(x, state, name='sum_state')
 
         # Log transform and apply dense
-        x = tf.math.divide(s, c, name='calc_mean')
+        x = s
         x = tf.math.multiply(x, self._w, 'multi_weights')
+        x = tf.math.add(x, tf.math.multiply(self._q, c))
         x = tf.math.add(x, self._bias, name='add_bias')
 
         x = self._post_activation(x)
@@ -84,8 +90,8 @@ class ParamAggModel(Model):
         for index, layer in enumerate(self.base.layers):
             layer.trainable = True
 
-        self.classify = Dense(num_classes, activation=None, name='classify')
         self.agg = RNN(ParamAggCell(pre_activation=pre_activation))
+        self.classify = Dense(num_classes, activation='sigmoid', name='classify')
 
     def get_config(self):
         config = super().get_config().copy()
@@ -102,13 +108,14 @@ class ParamAggModel(Model):
             x = Masking()(x)
 
         x = TimeDistributed(self.base)(x)
-        x = TimeDistributed(self.classify)(x)
+#        x = TimeDistributed(MaxPooling2D())(x)
 
         x = self.agg(x)
+        x = self.classify(x)
         return x
 
 
-class Mean(ParamAggModel):
+class Sum(ParamAggModel):
     def __init__(self, num_classes, input_shape):
         super().__init__(num_classes=num_classes, input_shape=input_shape, masked=True)
 

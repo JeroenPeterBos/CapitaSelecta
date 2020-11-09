@@ -28,6 +28,11 @@ class ParamAggCell(Layer):
             initializer='ones',
             name='weights'
         )
+        self._q = self.add_weight(
+            shape=(1, 1),
+            initializer='zeros',
+            name='std_weights'
+        )
         self._bias = self.add_weight(
             shape=(1, 1),
             initializer='zeros',
@@ -36,14 +41,14 @@ class ParamAggCell(Layer):
 
     @property
     def state_size(self):
-        return [tf.TensorShape([self._input_neurons]), tf.TensorShape([1])]
+        return [tf.TensorShape([self._input_neurons]), tf.TensorShape([self._input_neurons]), tf.TensorShape([self._input_neurons]), tf.TensorShape([1])]
 
     @property
     def output_size(self):
         return [tf.TensorShape([self._input_neurons])]
 
     def call(self, inputs, states):
-        state, count = states
+        sum_state, mean_state, sn_state, count_state = states
         x = inputs
 
         if self._pre_activation is not None:
@@ -51,18 +56,34 @@ class ParamAggCell(Layer):
             x = tf.math.multiply(self._pre_activation(x), tf.constant([1 - self._beta], dtype=K.floatx()))
             x = tf.math.add(x, y)
 
-        # Aggregate
-        c = tf.math.add(count, tf.constant([1], dtype=K.floatx()), name='count_increment')
-        s = tf.math.add(x, state, name='sum_state')
+        # Calculate the new states and the mean
+        count_new = tf.math.add(count_state, tf.constant([1], dtype=K.floatx()), name='count_increment')
+        sum_new = tf.math.add(x, sum_state, name='sum_state')
 
-        # Log transform and apply dense
-        x = tf.math.divide(s, c, name='calc_mean')
-        x = tf.math.multiply(x, self._w, 'multi_weights')
-        x = tf.math.add(x, self._bias, name='add_bias')
+        mean_new = tf.math.divide(sum_new, count_new, name='calc_mean')
 
-        x = self._post_activation(x)
+        sn_new = tf.math.add(
+            sn_state,
+            tf.math.multiply(
+                tf.math.subtract(x, mean_state, name='dmv_sn_sub_1'),
+                tf.math.subtract(x, mean_new, name='dmv_sn_sub_2'),
+                name='dmv_sn_mult'
+            ),
+            name='dmv_sn_add'
+        )
 
-        return x, (s, c)
+        var_new = tf.math.divide(sn_new, count_new)
+
+        # Calculating the output
+        out_mean = tf.math.multiply(mean_new, self._w)
+        out_var = tf.math.multiply(var_new, self._q)
+
+        out = tf.math.add(out_mean, out_var)
+        out = tf.math.add(out, self._bias, name='add_bias')
+
+        out = self._post_activation(out)
+
+        return out, (sum_new, mean_new, sn_new, count_new)
 
     def get_config(self):
         return {
@@ -73,11 +94,12 @@ class ParamAggCell(Layer):
 
 
 class ParamAggModel(Model):
-    def __init__(self, num_classes, input_shape, masked, pre_activation=None):
+    def __init__(self, num_classes, input_shape, masked, pre_activation=None, beta=0.1):
         self.num_classes = num_classes
         self.my_input_shape = input_shape
         self.masked = masked
         self.pre_activation = pre_activation
+        self.beta = beta
 
         super().__init__()
         self.base = DenseNet121(include_top=False, input_shape=input_shape, pooling='avg')
@@ -85,7 +107,7 @@ class ParamAggModel(Model):
             layer.trainable = True
 
         self.classify = Dense(num_classes, activation=None, name='classify')
-        self.agg = RNN(ParamAggCell(pre_activation=pre_activation))
+        self.agg = RNN(ParamAggCell(pre_activation=pre_activation, beta=beta))
 
     def get_config(self):
         config = super().get_config().copy()
@@ -93,6 +115,8 @@ class ParamAggModel(Model):
             'num_classes': self.num_classes,
             'input_shape': self.my_input_shape,
             'masked': self.masked,
+            'pre_activation': self.pre_activation,
+            'beta': self.beta
         })
         return config
 
@@ -108,7 +132,7 @@ class ParamAggModel(Model):
         return x
 
 
-class Mean(ParamAggModel):
+class Base(ParamAggModel):
     def __init__(self, num_classes, input_shape):
         super().__init__(num_classes=num_classes, input_shape=input_shape, masked=True)
 
@@ -118,11 +142,6 @@ class Sigmoid(ParamAggModel):
         super().__init__(num_classes=num_classes, input_shape=input_shape, masked=True, pre_activation='sigmoid')
 
 
-class Relu(ParamAggModel):
+class SigmoidBeta(ParamAggModel):
     def __init__(self, num_classes, input_shape):
-        super().__init__(num_classes=num_classes, input_shape=input_shape, masked=True, pre_activation='relu')
-
-
-class Tanh(ParamAggModel):
-    def __init__(self, num_classes, input_shape):
-        super().__init__(num_classes=num_classes, input_shape=input_shape, masked=True, pre_activation='tanh')
+        super().__init__(num_classes=num_classes, input_shape=input_shape, masked=True, pre_activation='sigmoid', beta=0.2)
