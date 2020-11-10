@@ -79,11 +79,12 @@ class ParamAggCell(Layer):
 
 
 class ParamAggModel(Model):
-    def __init__(self, num_classes, input_shape, masked, pre_activation=None):
+    def __init__(self, num_classes, input_shape, masked, pre_activation=None, final_node_aggregation=False):
         self.num_classes = num_classes
         self.my_input_shape = input_shape
         self.masked = masked
         self.pre_activation = pre_activation
+        self.final_node_aggregation = final_node_aggregation
 
         super().__init__()
         self.base = DenseNet121(include_top=False, input_shape=input_shape, pooling='avg')
@@ -91,7 +92,7 @@ class ParamAggModel(Model):
             layer.trainable = True
 
         self.agg = RNN(ParamAggCell(pre_activation=pre_activation))
-        self.classify = Dense(num_classes, activation='sigmoid', name='classify')
+        self.classify = Dense(num_classes, activation='sigmoid' if not final_node_aggregation else None, name='classify')
 
     def get_config(self):
         config = super().get_config().copy()
@@ -108,10 +109,15 @@ class ParamAggModel(Model):
             x = Masking()(x)
 
         x = TimeDistributed(self.base)(x)
-#        x = TimeDistributed(MaxPooling2D())(x)
 
-        x = self.agg(x)
-        x = self.classify(x)
+        if self.final_node_aggregation:
+            x = TimeDistributed(self.classify)(x)
+            x = self.agg(x)
+        else:
+            x = self.agg(x)
+            x = self.classify(x)
+
+#        x = TimeDistributed(MaxPooling2D())(x)
         return x
 
 
@@ -122,7 +128,7 @@ class Sum(ParamAggModel):
 
 class Sigmoid(ParamAggModel):
     def __init__(self, num_classes, input_shape):
-        super().__init__(num_classes=num_classes, input_shape=input_shape, masked=True, pre_activation='sigmoid')
+        super().__init__(num_classes=num_classes, input_shape=input_shape, masked=True, pre_activation='sigmoid', final_node_aggregation=False)
 
 
 class Relu(ParamAggModel):

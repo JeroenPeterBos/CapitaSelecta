@@ -110,20 +110,22 @@ def experiment(
 
     # Define the callbacks
     callbacks = [
-        EarlyStopping(monitor='val_loss', patience=15, verbose=1, min_delta=1e-4, mode='min'),
-        ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=5, verbose=1, min_delta=1e-4, mode='min', cooldown=3),
-
         CSVLogger(log_folder / 'log.csv'),
         EpochLogger()
     ]
 
     if args.tensorboard:
-        logging.info("Activated tensorboard monitor")
+        logging.info(f"Activated tensorboard monitor, logging to: {log_folder}")
         callbacks.append(TensorBoard(log_dir=log_folder, histogram_freq=1))
 
     if args.checkpoint:
         logging.info("Activated checkpoints callback")
         callbacks.append(ModelCheckpoint(monitor='val_loss', filepath=log_folder / 'saves' / 'checkpoints', save_best_only=True))
+
+    callbacks.extend([
+        EarlyStopping(monitor='val_loss', patience=12, verbose=1, min_delta=1e-4, mode='min'),
+        ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=5, verbose=1, min_delta=1e-4, mode='min', cooldown=2),
+    ])
 
     model.fit(
         x=train_dc.ds(),
