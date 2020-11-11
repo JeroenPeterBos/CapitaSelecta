@@ -9,6 +9,7 @@ import uuid
 import sys
 import io
 import pprint
+import random
 import time
 from datetime import datetime
 from pathlib import Path
@@ -19,6 +20,8 @@ from dmv.parser import parse_args
 from tensorflow.python.client import device_lib
 from tensorflow.keras.models import clone_model
 import tensorflow as tf
+
+import numpy as np
 
 
 logger = logging.getLogger()
@@ -94,6 +97,13 @@ def describe_environment(args):
     logger.info(f"The parameters describing the run are :\n{params.getvalue()}")
 
 
+def fix_randomization():
+    np.random.seed(15)
+    tf.random.set_seed(15)
+    random.seed(15)
+    os.environ['PYTHONHASHSEED'] = '15'
+
+
 def main(args):
     logger.info("Starting a new experiment")
 
@@ -145,6 +155,7 @@ if __name__ == '__main__':
     args, help_message = parse_args()
     setup_logger(args.logs, args.redirect_err)
     describe_environment(args)
+    fix_randomization()
 
     logger.info(f'Usage: \n\n{help_message}')
 

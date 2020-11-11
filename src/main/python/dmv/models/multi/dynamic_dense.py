@@ -171,6 +171,19 @@ class Mean(DynDenseModel):
         )
 
 
+class MeanTanh(DynDenseModel):
+    def __init__(self, num_classes, input_shape):
+        super().__init__(
+            num_classes=num_classes,
+            input_shape=input_shape,
+            agg_params={
+                'aggregations': ('mean', ),
+                'activation': 'tanh',
+                'count_order': 1
+            }
+        )
+
+
 class Max(DynDenseModel):
     def __init__(self, num_classes, input_shape):
         super().__init__(
@@ -235,6 +248,19 @@ class MeanStd(DynDenseModel):
             }
         )
 
+
+class MeanStdTanh(DynDenseModel):
+    def __init__(self, num_classes, input_shape):
+        super().__init__(
+            num_classes=num_classes,
+            input_shape=input_shape,
+            agg_params={
+                'aggregations': ('mean', 'std', ),
+                'activation': 'tanh',
+                'count_order': 1
+            }
+        )
+        
 
 class MeanMax(DynDenseModel):
     def __init__(self, num_classes, input_shape):

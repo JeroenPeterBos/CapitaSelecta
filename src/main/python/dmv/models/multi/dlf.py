@@ -81,18 +81,19 @@ class DynamicMultiViewMaxCell(Layer):
 
 
 class MultiViewDecisionLevelFusionModel(Model):
-    def __init__(self, num_classes, input_shape, aggregation_type, masked):
+    def __init__(self, num_classes, input_shape, aggregation_type, masked, post_activation=False):
         self.num_classes = num_classes
         self.my_input_shape = input_shape
         self.masked = masked
         self.aggregation_type = aggregation_type
+        self.post_activation = post_activation
 
         super().__init__()
         self.base = DenseNet121(include_top=False, input_shape=input_shape, pooling='avg')
         for index, layer in enumerate(self.base.layers):
             layer.trainable = True
 
-        self.classify = Dense(num_classes, activation='sigmoid', name='classify')
+        self.classify = Dense(num_classes, activation='sigmoid' if not post_activation else None, name='classify')
         self.agg = RNN(cell=self._translate_cell(aggregation_type)())
 
     @staticmethod
@@ -109,7 +110,8 @@ class MultiViewDecisionLevelFusionModel(Model):
             'num_classes': self.num_classes,
             'input_shape': self.my_input_shape,
             'masked': self.masked,
-            'aggregation_type': self.aggregation_type
+            'aggregation_type': self.aggregation_type,
+            'post_activation': self.post_activation
         })
         logger.debug(f'dlf: {config}')
         return config
@@ -119,28 +121,22 @@ class MultiViewDecisionLevelFusionModel(Model):
         if self.masked:
             x = Masking()(x)
 
-        x = TimeDistributed(self.base)(inputs)
+        x = TimeDistributed(self.base)(x)
         x = TimeDistributed(self.classify)(x)
 
         x = self.agg(x)
+
+        if self.post_activation:
+            x = tf.keras.activations.deserialize('sigmoid')(x)
+
         return x
-
-
-class Max(MultiViewDecisionLevelFusionModel):
-    def __init__(self, num_classes, input_shape):
-        super().__init__(num_classes=num_classes, input_shape=input_shape, aggregation_type='max', masked=False)
-
-
-class MaxMasked(MultiViewDecisionLevelFusionModel):
-    def __init__(self, num_classes, input_shape):
-        super().__init__(num_classes=num_classes, input_shape=input_shape, aggregation_type='max', masked=True)
 
 
 class Mean(MultiViewDecisionLevelFusionModel):
     def __init__(self, num_classes, input_shape):
-        super().__init__(num_classes=num_classes, input_shape=input_shape, aggregation_type='mean', masked=False)
-
-
-class MeanMasked(MultiViewDecisionLevelFusionModel):
-    def __init__(self, num_classes, input_shape):
         super().__init__(num_classes=num_classes, input_shape=input_shape, aggregation_type='mean', masked=True)
+
+
+class MeanPost(MultiViewDecisionLevelFusionModel):
+    def __init__(self, num_classes, input_shape):
+        super().__init__(num_classes=num_classes, input_shape=input_shape, aggregation_type='mean', masked=True, post_activation=True)
