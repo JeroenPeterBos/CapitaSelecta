@@ -110,6 +110,9 @@ def experiment(
 
     # Define the callbacks
     callbacks = [
+        EarlyStopping(monitor='val_loss', patience=12, verbose=1, min_delta=1e-4, mode='min'),
+        ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=5, verbose=1, min_delta=1e-4, mode='min', cooldown=2),
+
         CSVLogger(log_folder / 'log.csv'),
         EpochLogger()
     ]
@@ -121,11 +124,6 @@ def experiment(
     if args.checkpoint:
         logging.info("Activated checkpoints callback")
         callbacks.append(ModelCheckpoint(monitor='val_loss', filepath=log_folder / 'saves' / 'checkpoints', save_best_only=True))
-
-    callbacks.extend([
-        EarlyStopping(monitor='val_loss', patience=12, verbose=1, min_delta=1e-4, mode='min'),
-        ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=5, verbose=1, min_delta=1e-4, mode='min', cooldown=2),
-    ])
 
     model.fit(
         x=train_dc.ds(),
