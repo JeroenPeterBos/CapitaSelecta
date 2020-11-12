@@ -300,4 +300,17 @@ class SumMeanStdMax(DynDenseModel):
             }
         )
 
+
+class SumMeanStdMaxTanh(DynDenseModel):
+    def __init__(self, num_classes, input_shape):
+        super().__init__(
+            num_classes=num_classes,
+            input_shape=input_shape,
+            agg_params={
+                'aggregations': ('sum', 'mean', 'std', 'max'),
+                'activation': 'tanh',
+                'count_order': 1
+            }
+        )
+
 # From tensorboard it looks like count_order > 1 does not seem to really help
