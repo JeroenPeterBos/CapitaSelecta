@@ -29,63 +29,15 @@ class DynamicMultiViewMeanCell(Layer):
         return output, (new_state, new_count)
 
 
-class DynamicMultiViewSumCell(Layer):
-    def build(self, input_shape):
-        if not isinstance(input_shape[0], tuple):
-            self.masked = False
-            self.units = input_shape[-1]
-        else:
-            self.masked = True
-            self.units = input_shape[0][-1]
-        self.built = True
-
-    @property
-    def state_size(self):
-        return self.units
-
-    def call(self, inputs, states):
-        state = states[0]
-
-        if self.masked:
-            inputs, mask = inputs
-            new_state = tf.math.add(tf.math.multiply(inputs, mask), state)
-        else:
-            new_state = tf.math.add(inputs, state)
-
-        return new_state, new_state
-
-
-class DynamicMultiViewMaxCell(Layer):
-    def build(self, input_shape):
-        if not isinstance(input_shape[0], tuple):
-            self.masked = False
-            self.units = input_shape[-1]
-        else:
-            self.masked = True
-            self.units = input_shape[0][-1]
-        self.built = True
-
-    @property
-    def state_size(self):
-        return self.units
-
-    def call(self, inputs, states):
-        state = states[0]
-
-        if self.masked:
-            inputs, mask = inputs
-            inputs = tf.math.multiply(inputs, mask)
-
-        output = K.maximum(inputs, state)
-        return output, output
-
-
 class MultiViewDecisionLevelFusionModel(Model):
-    def __init__(self, num_classes, input_shape, aggregation_type, masked, post_activation=False):
+    def __init__(self, num_classes, input_shape, aggregation_type, masked, aggregation_layer=-1, post_activation=False):
+        assert aggregation_layer in [-1, -2], "Aggregation layer must be either the last or one but last layer."
+
         self.num_classes = num_classes
         self.my_input_shape = input_shape
         self.masked = masked
         self.aggregation_type = aggregation_type
+        self.aggregation_layer = aggregation_layer
         self.post_activation = post_activation
 
         super().__init__()
@@ -93,15 +45,13 @@ class MultiViewDecisionLevelFusionModel(Model):
         for index, layer in enumerate(self.base.layers):
             layer.trainable = True
 
-        self.classify = Dense(num_classes, activation='sigmoid' if not post_activation else None, name='classify')
+        self.classify = Dense(num_classes, activation='sigmoid' if not post_activation or aggregation_layer == -2 else None, name='classify')
         self.agg = RNN(cell=self._translate_cell(aggregation_type)())
 
     @staticmethod
     def _translate_cell(cell):
         return {
             'mean': DynamicMultiViewMeanCell,
-            'sum': DynamicMultiViewSumCell,
-            'max': DynamicMultiViewMaxCell
         }[cell]
 
     def get_config(self):
@@ -122,12 +72,19 @@ class MultiViewDecisionLevelFusionModel(Model):
             x = Masking()(x)
 
         x = TimeDistributed(self.base)(x)
-        x = TimeDistributed(self.classify)(x)
 
-        x = self.agg(x)
+        if self.aggregation_layer == -1:
+            x = TimeDistributed(self.classify)(x)
 
-        if self.post_activation:
-            x = tf.keras.activations.deserialize('sigmoid')(x)
+            x = self.agg(x)
+            if self.post_activation:
+                x = tf.keras.activations.deserialize('sigmoid')(x)
+        elif self.aggregation_layer == -2:
+            x = self.agg(x)
+            if self.post_activation:
+                x = tf.keras.activations.deserialize('sigmoid')(x)
+
+            x = self.classify(x)
 
         return x
 
@@ -140,3 +97,13 @@ class Mean(MultiViewDecisionLevelFusionModel):
 class MeanPost(MultiViewDecisionLevelFusionModel):
     def __init__(self, num_classes, input_shape):
         super().__init__(num_classes=num_classes, input_shape=input_shape, aggregation_type='mean', masked=True, post_activation=True)
+
+
+class MeanEmbedding(MultiViewDecisionLevelFusionModel):
+    def __init__(self, num_classes, input_shape):
+        super().__init__(num_classes=num_classes, input_shape=input_shape, aggregation_type='mean', masked=True, aggregation_layer=-2)
+
+
+class MeanPostEmbedding(MultiViewDecisionLevelFusionModel):
+    def __init__(self, num_classes, input_shape):
+        super().__init__(num_classes=num_classes, input_shape=input_shape, aggregation_type='mean', masked=True, aggregation_layer=-2, post_activation=True)

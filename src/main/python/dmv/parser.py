@@ -150,7 +150,7 @@ def parse_args():
     args.multi = 'multi' in args.model
     args.model = get_model_from_str(args.model)
 
-    args.logs = args.logs / ('multi' if args.multi else 'single') / args.run_id / f'{datetime.now().strftime("%m-%d_%H-%M")}'
+    args.logs = args.logs / ('multi' if args.multi else 'single') / (args.category.lower() if args.category is not None else 'full') / args.run_id / f'{datetime.now().strftime("%m-%d_%H-%M")}'
 
     return args, help_message
 
