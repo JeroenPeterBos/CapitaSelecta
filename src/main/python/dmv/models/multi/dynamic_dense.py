@@ -314,3 +314,62 @@ class SumMeanStdMaxTanh(DynDenseModel):
         )
 
 # From tensorboard it looks like count_order > 1 does not seem to really help
+
+class LateMean(DynDenseModel):
+    def __init__(self, num_classes, input_shape):
+        super().__init__(
+            num_classes=num_classes,
+            input_shape=input_shape,
+            merge_depth=-1,
+            dense_activation=None,
+            agg_params={
+                'aggregations': ('mean',),
+                'activation': 'sigmoid',
+                'count_order': 1
+            }
+        )
+
+
+class LateMeanTanh(DynDenseModel):
+    def __init__(self, num_classes, input_shape):
+        super().__init__(
+            num_classes=num_classes,
+            input_shape=input_shape,
+            merge_depth=-1,
+            dense_activation='tanh',
+            agg_params={
+                'aggregations': ('mean',),
+                'activation': 'sigmoid',
+                'count_order': 1
+            }
+        )
+
+
+class LateMeanStd(DynDenseModel):
+    def __init__(self, num_classes, input_shape):
+        super().__init__(
+            num_classes=num_classes,
+            input_shape=input_shape,
+            merge_depth=-1,
+            dense_activation=None,
+            agg_params={
+                'aggregations': ('mean', 'std',),
+                'activation': 'sigmoid',
+                'count_order': 1
+            }
+        )
+
+
+class LateMeanStdTanh(DynDenseModel):
+    def __init__(self, num_classes, input_shape):
+        super().__init__(
+            num_classes=num_classes,
+            input_shape=input_shape,
+            merge_depth=-1,
+            dense_activation='tanh',
+            agg_params={
+                'aggregations': ('mean', 'std',),
+                'activation': 'sigmoid',
+                'count_order': 1
+            }
+        )
