@@ -31,6 +31,7 @@ def _benchmark(dataset, num_epochs=1, sleep=0.0):
 class DataContainer:
     def __init__(self,
                  root,
+                 meta_csv=None,
                  category=None,
                  train=True,
                  augmentation=None,
@@ -49,10 +50,11 @@ class DataContainer:
         self._output_shape = [None] + output_shape if self._multi else output_shape
         self._train = train
         self._dtype = dtype if dtype is not None else K.floatx()
+        self._meta_csv = meta_csv if meta_csv is not None else (self._root / 'MURA-v1.1' / f'{"train" if self._train else "valid"}_image_paths.csv')
 
         # Load the Meta Dataframe
         df = self._mura_meta()
-        if category is not None:
+        if category is not None and category != 'Full':
             df = df[df['location'] == category]
         if max_imgs is not None:
             df = df[df['file'].str.len() <= max_imgs]
@@ -179,7 +181,7 @@ class DataContainer:
         return f
     
     def _mura_meta(self):
-        df = pd.read_csv(self._root / 'MURA-v1.1' / f'{"train" if self._train else "valid"}_image_paths.csv', header=None, names=['full_path'])
+        df = pd.read_csv(self._meta_csv, header=None, names=['full_path'])
 
         components = df['full_path'].str.split('/')
         df['folder'] = components.str[:-1].str.join('/')
@@ -188,12 +190,12 @@ class DataContainer:
         df = df.groupby('folder').agg({'file': lambda x: list(x)}).reset_index()
 
         components = df['folder'].str.split('/')
-        df['location'] = components.str[2].str.split('XR_').str[1].str.title()
-        df['patient'] = components.str[3].str.replace('patient', '')
-        df['session'] = components.str[4].str.split('_').str[0].str.replace('study', '')
+        df['location'] = components.str[-3].str.split('XR_').str[1].str.title()
+        df['patient'] = components.str[-2].str.replace('patient', '')
+        df['session'] = components.str[-1].str.split('_').str[0].str.replace('study', '')
         df['study'] = df['patient'] + '-' + df['session']
 
-        df['label'] = ((components.str[4]).str.contains('positive')).astype(int)
+        df['label'] = ((components.str[-1]).str.contains('positive')).astype(int)
         df['index'] = df.index
         return df
     

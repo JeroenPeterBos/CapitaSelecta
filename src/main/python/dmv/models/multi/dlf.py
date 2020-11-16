@@ -93,17 +93,33 @@ class Mean(MultiViewDecisionLevelFusionModel):
     def __init__(self, num_classes, input_shape):
         super().__init__(num_classes=num_classes, input_shape=input_shape, aggregation_type='mean', masked=True)
 
+    @staticmethod
+    def folder_id():
+        return "fusion-mean"
+
 
 class MeanPost(MultiViewDecisionLevelFusionModel):
     def __init__(self, num_classes, input_shape):
         super().__init__(num_classes=num_classes, input_shape=input_shape, aggregation_type='mean', masked=True, post_activation=True)
+
+    @staticmethod
+    def folder_id():
+        return "fusion-mean-post"
 
 
 class MeanEmbedding(MultiViewDecisionLevelFusionModel):
     def __init__(self, num_classes, input_shape):
         super().__init__(num_classes=num_classes, input_shape=input_shape, aggregation_type='mean', masked=True, aggregation_layer=-2)
 
+    @staticmethod
+    def folder_id():
+        return "fusion-mean-emb"
+
 
 class MeanPostEmbedding(MultiViewDecisionLevelFusionModel):
     def __init__(self, num_classes, input_shape):
         super().__init__(num_classes=num_classes, input_shape=input_shape, aggregation_type='mean', masked=True, aggregation_layer=-2, post_activation=True)
+
+    @staticmethod
+    def folder_id():
+        return "fusion-mean-post-emb"

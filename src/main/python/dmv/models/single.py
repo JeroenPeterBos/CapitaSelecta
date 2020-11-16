@@ -7,17 +7,15 @@ from tensorflow.keras.applications import DenseNet121
 import tensorflow as tf
 
 
-class MultiEvalModel(Model, ABC):
-    def test_step(self, data):
-        data = data_adapter.expand_1d(data)
-        x, y, sample_weight = data_adapter.unpack_x_y_sample_weight(data)
 
+class MultiEvalModel(Model, ABC):
+    def dlf(self, x):
         x_mask = tf.expand_dims(tf.cast(
-                tf.math.greater(
-                    tf.math.count_nonzero(x, axis=[2, 3, 4]),
-                    tf.constant([0], dtype=tf.int64)
-                ),
-                tf.keras.backend.floatx()), axis=-1)
+            tf.math.greater(
+                tf.math.count_nonzero(x, axis=[2, 3, 4]),
+                tf.constant([0], dtype=tf.int64)
+            ),
+            tf.keras.backend.floatx()), axis=-1)
 
         x = tf.transpose(x, perm=[1, 0, 2, 3, 4])
         y_preds = tf.map_fn(fn=lambda t: self(t, training=False), elems=x)
@@ -28,11 +26,24 @@ class MultiEvalModel(Model, ABC):
             tf.math.reduce_sum(x_mask, axis=1)
         )
 
+        return y_pred
+
+    def test_step(self, data):
+        data = data_adapter.expand_1d(data)
+        x, y, sample_weight = data_adapter.unpack_x_y_sample_weight(data)
+
+        y_pred = self.dlf(x)
+
         # Updates stateful loss metrics.
         self.compiled_loss(y, y_pred, sample_weight, regularization_losses=self.losses)
 
         self.compiled_metrics.update_state(y, y_pred, sample_weight)
         return {m.name: m.result() for m in self.metrics}
+
+    def predict_step(self, data):
+        data = data_adapter.expand_1d(data)
+        x, _, _ = data_adapter.unpack_x_y_sample_weight(data)
+        return self.dlf(x)
 
 
 class Mura(MultiEvalModel):
@@ -59,3 +70,7 @@ class Mura(MultiEvalModel):
         x = self.classify(x)
 
         return x
+
+    @staticmethod
+    def folder_id():
+        return 'single'

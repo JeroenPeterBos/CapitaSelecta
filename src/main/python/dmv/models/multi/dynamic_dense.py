@@ -170,6 +170,10 @@ class Mean(DynDenseModel):
             }
         )
 
+    @staticmethod
+    def folder_id():
+        return 'dd-mean'
+
 
 class MeanTanh(DynDenseModel):
     def __init__(self, num_classes, input_shape):
@@ -182,6 +186,10 @@ class MeanTanh(DynDenseModel):
                 'count_order': 1
             }
         )
+
+    @staticmethod
+    def folder_id():
+        return 'dd-mean-tanh'
 
 
 class Max(DynDenseModel):
@@ -248,6 +256,10 @@ class MeanStd(DynDenseModel):
             }
         )
 
+    @staticmethod
+    def folder_id():
+        return 'dd-mean-std'
+
 
 class MeanStdTanh(DynDenseModel):
     def __init__(self, num_classes, input_shape):
@@ -260,6 +272,10 @@ class MeanStdTanh(DynDenseModel):
                 'count_order': 1
             }
         )
+
+    @staticmethod
+    def folder_id():
+        return 'dd-mean-std-tanh'
         
 
 class MeanMax(DynDenseModel):
