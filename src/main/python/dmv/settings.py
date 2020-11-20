@@ -1,0 +1,1 @@
+DENSENET_INIT = 'imagenet'

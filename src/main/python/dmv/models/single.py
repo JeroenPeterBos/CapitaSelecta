@@ -6,6 +6,7 @@ from tensorflow.keras.layers import Dense
 from tensorflow.keras.applications import DenseNet121
 import tensorflow as tf
 
+from dmv import settings
 
 
 class MultiEvalModel(Model, ABC):
@@ -52,7 +53,7 @@ class Mura(MultiEvalModel):
         self.num_classes = num_classes
         self.my_input_shape = input_shape
 
-        self.base = DenseNet121(include_top=False, input_shape=input_shape, pooling='avg')
+        self.base = DenseNet121(include_top=False, input_shape=input_shape, pooling='avg', weights=settings.DENSENET_INIT)
         for index, layer in enumerate(self.base.layers):
             layer.trainable = True
 
